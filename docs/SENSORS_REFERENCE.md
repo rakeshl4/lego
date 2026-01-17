@@ -7,7 +7,11 @@ Learn how to use sensors on your Spike robot!
 ## 📚 Import the Library
 
 ```python
-from spike import ColorSensor, DistanceSensor, ForceSensor, MotionSensor
+import runloop
+from hub import port, motion_sensor
+import color_sensor
+import distance_sensor
+import force_sensor
 ```
 
 ---
@@ -19,35 +23,45 @@ Detects colors and light!
 ### Connect to Sensor
 
 ```python
-color = ColorSensor('C')  # Color sensor in port C
+# Color sensor in port C (use port.A, port.B, port.C, etc.)
 ```
 
 ### Read Color
 
 ```python
-# Get the color name
-detected = color.get_color()
-print(detected)  # Prints: "red", "blue", "green", etc.
+# Get the color value
+detected = color_sensor.color(port.C)
+print(detected)  # Prints color code
 
 # Check for specific color
-if color.get_color() == "red":
+if color_sensor.color(port.C) == color_sensor.RED:
     print("I see red!")
+
+# Color constants: RED, GREEN, BLUE, YELLOW, WHITE, BLACK
 ```
 
 ### Read Light Intensity
 
 ```python
-# Get brightness (0-100)
-brightness = color.get_ambient_light()
-print(brightness)
+# Get reflected light (0-100)
+reflection = color_sensor.reflection(port.C)
+print(reflection)
+
+# Get RGB values
+red, green, blue = color_sensor.rgbi(port.C)[:3]
+print(f"R:{red} G:{green} B:{blue}")
 ```
 
 ### Wait for Color
 
 ```python
-# Wait until you see red
-color.wait_until_color("red")
-print("Found red!")
+# Wait until you see red (use async)
+async def main():
+    while color_sensor.color(port.C) != color_sensor.RED:
+        await runloop.sleep_ms(10)
+    print("Found red!")
+
+runloop.run(main())
 ```
 
 ---
@@ -59,27 +73,35 @@ Measures how far away things are!
 ### Connect to Sensor
 
 ```python
-distance = DistanceSensor('D')  # Distance sensor in port D
+# Distance sensor in port D (use port.A, port.B, port.C, etc.)
 ```
 
 ### Read Distance
 
 ```python
-# Get distance in centimeters
-cm = distance.get_distance_cm()
+# Get distance in millimeters
+mm = distance_sensor.distance(port.D)
+print(f"Distance: {mm} mm")
+
+# Convert to centimeters
+cm = mm / 10
 print(f"Distance: {cm} cm")
 
 # Check if something is close
-if distance.get_distance_cm() < 10:
+if distance_sensor.distance(port.D) < 100:  # Less than 10 cm
     print("Too close!")
 ```
 
 ### Wait for Object
 
 ```python
-# Wait until something gets close
-distance.wait_for_distance_closer_than(20, 'cm')
-print("Something nearby!")
+# Wait until something gets close (use async)
+async def main():
+    while distance_sensor.distance(port.D) > 200:  # More than 20 cm
+        await runloop.sleep_ms(10)
+    print("Something nearby!")
+
+runloop.run(main())
 ```
 
 ---
@@ -91,35 +113,39 @@ Detects pushing and pressing!
 ### Connect to Sensor
 
 ```python
-force = ForceSensor('E')  # Force sensor in port E
+# Force sensor in port E (use port.A, port.B, port.C, etc.)
 ```
 
 ### Check if Pressed
 
 ```python
 # Is button pressed?
-if force.is_pressed():
+if force_sensor.pressed(port.E):
     print("Button is pressed!")
 ```
 
 ### Read Force Amount
 
 ```python
-# Get force in newtons
-strength = force.get_force_newton()
-print(f"Force: {strength} N")
+# Get force value (0-10)
+strength = force_sensor.force(port.E)
+print(f"Force: {strength}")
 
-# Get force as percentage
-percent = force.get_force_percentage()
-print(f"Force: {percent}%")
+# Convert to approximate newtons (multiply by 0.1)
+newtons = strength * 0.1
+print(f"Force: {newtons} N")
 ```
 
 ### Wait for Press
 
 ```python
-# Wait until button is pressed
-force.wait_until_pressed()
-print("Button pressed!")
+# Wait until button is pressed (use async)
+async def main():
+    while not force_sensor.pressed(port.E):
+        await runloop.sleep_ms(10)
+    print("Button pressed!")
+
+runloop.run(main())
 ```
 
 ---
@@ -131,34 +157,38 @@ Detects tilting and shaking!
 ### Connect to Sensor
 
 ```python
-motion = MotionSensor()  # Built into the hub!
+# Built into the hub! Use motion_sensor module
 ```
 
 ### Check Orientation
 
 ```python
 # Which way is the hub facing?
-direction = motion.get_yaw_angle()
+direction = motion_sensor.tilt_angles()[0]  # Yaw angle
 print(direction)
 
-# Is hub tilted?
-tilt = motion.get_pitch_angle()
-print(tilt)
+# Get pitch and roll
+pitch, roll, yaw = motion_sensor.tilt_angles()
+print(f"Pitch: {pitch}, Roll: {roll}, Yaw: {yaw}")
 ```
 
 ### Detect Shaking
 
 ```python
-# Check if shaking
-if motion.was_gesture('shaken'):
+# Get gesture (returns gesture code)
+gesture = motion_sensor.gesture()
+
+# Gesture constants:
+# TAPPED, DOUBLE_TAPPED, SHAKEN, FALLING, UNKNOWN
+if gesture == motion_sensor.SHAKEN:
     print("Hub was shaken!")
 ```
 
 ### Reset Position
 
 ```python
-# Reset the motion sensor
-motion.reset_yaw_angle()
+# Reset the yaw angle to 0
+motion_sensor.reset_yaw(0)
 ```
 
 ---
@@ -168,63 +198,83 @@ motion.reset_yaw_angle()
 ### Example 1: Color Reaction
 
 ```python
-from spike import ColorSensor
+import runloop
+from hub import port
+import color_sensor
 
-color = ColorSensor('C')
+async def main():
+    while True:
+        color = color_sensor.color(port.C)
+        if color == color_sensor.RED:
+            print("STOP!")
+        elif color == color_sensor.GREEN:
+            print("GO!")
+        await runloop.sleep_ms(100)
 
-while True:
-    if color.get_color() == "red":
-        print("STOP!")
-    elif color.get_color() == "green":
-        print("GO!")
+runloop.run(main())
 ```
 
 ### Example 2: Distance Alert
 
 ```python
-from spike import DistanceSensor
+import runloop
+from hub import port
+import distance_sensor
 
-distance = DistanceSensor('D')
+async def main():
+    dist = distance_sensor.distance(port.D)  # in mm
+    
+    if dist < 100:  # Less than 10 cm
+        print("DANGER! Too close!")
+    elif dist < 200:  # Less than 20 cm
+        print("Warning: Getting close")
+    else:
+        print("All clear")
 
-dist = distance.get_distance_cm()
-
-if dist < 10:
-    print("DANGER! Too close!")
-elif dist < 20:
-    print("Warning: Getting close")
-else:
-    print("All clear")
+runloop.run(main())
 ```
 
 ### Example 3: Force Counter
 
 ```python
-from spike import ForceSensor
+import runloop
+from hub import port
+import force_sensor
 
-force = ForceSensor('E')
 count = 0
 
-for i in range(5):
-    force.wait_until_pressed()
-    count = count + 1
-    print(f"Press count: {count}")
-    force.wait_until_released()
+async def main():
+    global count
+    for i in range(5):
+        # Wait for press
+        while not force_sensor.pressed(port.E):
+            await runloop.sleep_ms(10)
+        
+        count = count + 1
+        print(f"Press count: {count}")
+        
+        # Wait for release
+        while force_sensor.pressed(port.E):
+            await runloop.sleep_ms(10)
+    
+    print(f"Total presses: {count}")
 
-print(f"Total presses: {count}")
+runloop.run(main())
 ```
 
 ### Example 4: Motion Control
 
 ```python
-from spike import MotionSensor
-import time
+import runloop
+from hub import motion_sensor
 
-motion = MotionSensor()
+async def main():
+    for i in range(10):
+        if motion_sensor.gesture() == motion_sensor.SHAKEN:
+            print("🎉 Hub shaken!")
+        await runloop.sleep_ms(500)
 
-for i in range(10):
-    if motion.was_gesture('shaken'):
-        print("🎉 Hub shaken!")
-    time.sleep(0.5)
+runloop.run(main())
 ```
 
 ---

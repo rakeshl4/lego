@@ -7,7 +7,10 @@ Learn how to control motors on your Spike robot!
 ## 📚 Import the Library
 
 ```python
-from spike import Motor, MotorPair
+import runloop
+from hub import port, motion_sensor
+import motor
+import motor_pair
 ```
 
 ---
@@ -17,38 +20,48 @@ from spike import Motor, MotorPair
 ### Connect to a Motor
 
 ```python
-my_motor = Motor('A')  # Motor plugged into port A
+# Motor plugged into port A
+# Use port.A, port.B, port.C, port.D, port.E, or port.F
 ```
 
 ### Run the Motor
 
 ```python
-# Run forward
-my_motor.run_for_degrees(360)  # Turn 1 full rotation
+# Run forward for degrees (async)
+async def main():
+    await motor.run_for_degrees(port.A, 360, 500)  # 360 degrees at 500 speed
 
-# Run at a speed (0-100)
-my_motor.start(50)  # Run at 50% speed
+runloop.run(main())
 
-# Stop the motor
-my_motor.stop()
+# Or run to absolute position
+async def main():
+    await motor.run_to_absolute_position(port.A, 0, 500)  # Go to 0 degrees
+
+runloop.run(main())
 ```
 
 ### Motor Direction
 
 ```python
-# Run forward
-my_motor.run_for_degrees(360)
+async def main():
+    # Run forward
+    await motor.run_for_degrees(port.A, 360, 500)
+    
+    # Run backward (use negative degrees)
+    await motor.run_for_degrees(port.A, -360, 500)
 
-# Run backward (use negative)
-my_motor.run_for_degrees(-360)
+runloop.run(main())
 ```
 
 ### Check Motor Position
 
 ```python
 # Get current position
-position = my_motor.get_position()
+position = motor.relative_position(port.A)
 print(position)
+
+# Reset position to 0
+motor.reset_relative_position(port.A, 0)
 ```
 
 ---
@@ -60,40 +73,50 @@ Perfect for driving robots with two wheels!
 ### Connect Motor Pair
 
 ```python
-wheels = MotorPair('A', 'B')  # Left motor in A, Right motor in B
+# Pair motors in ports A and B
+motor_pair.pair(motor_pair.PAIR_1, port.A, port.B)
 ```
 
 ### Drive Forward/Backward
 
 ```python
-# Move forward
-wheels.move(10, 'cm')  # Move 10 centimeters
+async def main():
+    # Move forward for degrees
+    await motor_pair.move_for_degrees(motor_pair.PAIR_1, 360, 0)  # 360 degrees, 0 steering
+    
+    # Move backward (use negative degrees)
+    await motor_pair.move_for_degrees(motor_pair.PAIR_1, -360, 0)
 
-# Move backward (negative)
-wheels.move(-10, 'cm')
+runloop.run(main())
 ```
 
 ### Turn the Robot
 
 ```python
-# Turn right
-wheels.move(5, 'cm', steering=100)
+async def main():
+    # Turn right (positive steering)
+    await motor_pair.move_for_degrees(motor_pair.PAIR_1, 360, 100)
+    
+    # Turn left (negative steering)
+    await motor_pair.move_for_degrees(motor_pair.PAIR_1, 360, -100)
+    
+    # Gentle curve (steering -100 to 100)
+    await motor_pair.move_for_degrees(motor_pair.PAIR_1, 720, 50)
 
-# Turn left
-wheels.move(5, 'cm', steering=-100)
-
-# Gentle curve (steering 0-100)
-wheels.move(10, 'cm', steering=50)
+runloop.run(main())
 ```
 
 ### Start/Stop Motor Pair
 
 ```python
-# Start moving
-wheels.start(speed=50)
+# Start moving (non-blocking)
+motor_pair.move(motor_pair.PAIR_1, 0)  # 0 steering, default velocity
+
+# Move with specific steering
+motor_pair.move(motor_pair.PAIR_1, 50, velocity=500)  # 50 steering, 500 velocity
 
 # Stop moving
-wheels.stop()
+motor_pair.stop(motor_pair.PAIR_1)
 ```
 
 ---
@@ -103,32 +126,47 @@ wheels.stop()
 ### Example 1: Make Motor Spin
 
 ```python
-from spike import Motor
+import runloop
+from hub import port
+import motor
 
-motor = Motor('A')
-motor.run_for_degrees(360)  # One full turn
+async def main():
+    await motor.run_for_degrees(port.A, 360, 500)  # One full turn
+
+runloop.run(main())
 ```
 
 ### Example 2: Drive Forward and Back
 
 ```python
-from spike import MotorPair
+import runloop
+from hub import port
+import motor_pair
 
-wheels = MotorPair('A', 'B')
-wheels.move(20, 'cm')   # Forward
-wheels.move(-20, 'cm')  # Backward
+motor_pair.pair(motor_pair.PAIR_1, port.A, port.B)
+
+async def main():
+    await motor_pair.move_for_degrees(motor_pair.PAIR_1, 720, 0)   # Forward
+    await motor_pair.move_for_degrees(motor_pair.PAIR_1, -720, 0)  # Backward
+
+runloop.run(main())
 ```
 
 ### Example 3: Square Drive Pattern
 
 ```python
-from spike import MotorPair
+import runloop
+from hub import port
+import motor_pair
 
-wheels = MotorPair('A', 'B')
+motor_pair.pair(motor_pair.PAIR_1, port.A, port.B)
 
-for i in range(4):
-    wheels.move(10, 'cm')              # Forward
-    wheels.move(5, 'cm', steering=100) # Turn right
+async def main():
+    for i in range(4):
+        await motor_pair.move_for_degrees(motor_pair.PAIR_1, 360, 0)    # Forward
+        await motor_pair.move_for_degrees(motor_pair.PAIR_1, 180, 100)  # Turn right
+
+runloop.run(main())
 ```
 
 ---
